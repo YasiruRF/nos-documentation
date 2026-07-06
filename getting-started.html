@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quickstart Guide - NOS Documentation</title>
+    <title>Writing a simple node (NOS) - NOS Documentation</title>
     <link rel="stylesheet" href="index.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
 </head>
@@ -42,6 +42,7 @@
                     <li class="sidebar-item"><a href="index.html" class="sidebar-link">Introduction</a></li>
                     <li class="sidebar-item"><a href="installation.html" class="sidebar-link">Installation</a></li>
                     <li class="sidebar-item"><a href="getting-started.html" class="sidebar-link active">Quickstart Guide</a></li>
+                    <li class="sidebar-item"><a href="cookbook.html" class="sidebar-link">Cookbook / Tasks</a></li>
                 </ul>
             </div>
             
@@ -73,14 +74,31 @@
         <!-- Main Content -->
         <main class="main-content">
             <section>
-                <h1>Quickstart Guide</h1>
+                <h1>Writing a simple node (NOS)</h1>
+                <p><strong>Goal:</strong> Create, compile, and run your first declaratively configured ROS2 node in NOS.</p>
+                <p><strong>Tutorial level:</strong> Beginner</p>
+                <p><strong>Time:</strong> 10 minutes</p>
+
+                <h2>Background</h2>
                 <p>
-                    Let's create a minimal system containing a single Node that subscribes to raw integer data, 
-                    filters out values, and republishes the result.
+                    In this tutorial, you will create a simple data filter node. In standard ROS2, writing a node in Python requires manually 
+                    importing libraries, inheriting from <code>Node</code>, declaring parameters in the constructor, setting up subscriptions 
+                    and publications, and manually building configuration files.
+                </p>
+                <p>
+                    NOS lets you declare this structure simply and generates the full buildable ROS2 package automatically.
                 </p>
 
-                <h2>Step 1: Write the `.nos` file</h2>
-                <p>Create a file named <code>filter_system.nos</code>:</p>
+                <h2>Prerequisites</h2>
+                <p>
+                    Before starting, ensure you have installed the <code>nos</code> package according to the 
+                    <a href="installation.html">Installation Guide</a>, and that your ROS2 environment is sourced.
+                </p>
+
+                <h2>Tasks</h2>
+
+                <h3>1. Write the declarative source file</h3>
+                <p>Create a file named <code>filter_system.nos</code> and add the following code:</p>
                 <pre><code class="language-python">package filter_system
 version "0.1.0"
 
@@ -98,46 +116,40 @@ node ValueFilter {
     }
 
     on_init -> {
-        self.get_logger().info("Filter Node active!")
+        self.get_logger().info("ValueFilter Node initialized!")
     }
 
     on on_input_data_received(msg: std_msgs::Int32) -> {
-        # Check against value parameters
         if msg.data > self.threshold:
-            # Create a new Int32 message and republish
             out = Int32()
             out.data = msg.data
             self.output_data.publish(out)
-            self.get_logger().info(f"Published filtered value: {msg.data}")
     }
 }</code></pre>
 
-                <h2>Step 2: Compile the package</h2>
-                <p>Run the <code>nos compile</code> CLI command, pointing to the source file and specifying the output package root:</p>
-                <pre><code class="language-bash">nos compile filter_system.nos --output ./src</code></pre>
-                
-                <h2>Step 3: Analyze the output structure</h2>
-                <p>NOS automatically creates a standard ROS2 `ament_python` package inside your folder:</p>
-                <pre><code class="language-text">src/
-└── filter_system/
-    ├── filter_system/
-    │   ├── __init__.py
-    │   └── ValueFilter.py      # Generated ROS2 python node
-    ├── launch/                 # Output launch configs (if declared)
-    ├── resource/
-    │   └── filter_system       # Package marker file
-    ├── package.xml             # Declared executable dependencies
-    ├── setup.cfg
-    └── setup.py                # Console script entry points</code></pre>
+                <h4>Code Breakdown</h4>
+                <ul>
+                    <li><strong><code>package filter_system</code></strong>: Declares the target package container.</li>
+                    <li><strong><code>node ValueFilter</code></strong>: Declares a new ROS2 node named <code>ValueFilter</code>.</li>
+                    <li><strong><code>parameters { threshold: int = 10 }</code></strong>: Automatically declares a node parameter in the ROS2 parameter server with a default value of 10.</li>
+                    <li><strong><code>subscriptions { ... }</code></strong>: Declares a subscriber listening to `std_msgs/Int32` on the `/numbers/raw` topic.</li>
+                    <li><strong><code>publications { ... }</code></strong>: Declares a publisher sending `std_msgs/Int32` on the `/numbers/filtered` topic.</li>
+                    <li><strong><code>on_init -> { ... }</code></strong>: Run at start.</li>
+                    <li><strong><code>on on_input_data_received(msg) -> { ... }</code></strong>: Automatically bound as the subscriber callback.</li>
+                </ul>
 
-                <h2>Step 4: Build and Source</h2>
-                <p>Use your ROS2 workspace build tool (Colcon) to build the generated package:</p>
-                <pre><code class="language-bash"># Run from your colcon workspace root (e.g. ~/ros2_ws)
-colcon build --packages-select filter_system
+                <h3>2. Compile the package with the CLI</h3>
+                <p>Run the compiler in your terminal, specifying an output directory:</p>
+                <pre><code class="language-bash">nos compile filter_system.nos --output ./src</code></pre>
+                <p>The compiler generates a full ROS2 package layout under <code>./src/filter_system</code>.</p>
+
+                <h3>3. Build the package with Colcon</h3>
+                <p>Navigate to your workspace root and compile the package using the ROS2 build tool Colcon:</p>
+                <pre><code class="language-bash">colcon build --packages-select filter_system
 source install/setup.bash</code></pre>
 
-                <h2>Step 5: Run the Node</h2>
-                <p>Run the compiled Node executable directly from ROS2:</p>
+                <h3>4. Run the node</h3>
+                <p>Run the generated node executable using the standard ROS2 runner command:</p>
                 <pre><code class="language-bash">ros2 run filter_system ValueFilter</code></pre>
             </section>
         </main>

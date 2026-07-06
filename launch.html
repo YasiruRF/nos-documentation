@@ -42,6 +42,7 @@
                     <li class="sidebar-item"><a href="index.html" class="sidebar-link">Introduction</a></li>
                     <li class="sidebar-item"><a href="installation.html" class="sidebar-link">Installation</a></li>
                     <li class="sidebar-item"><a href="getting-started.html" class="sidebar-link">Quickstart Guide</a></li>
+                    <li class="sidebar-item"><a href="cookbook.html" class="sidebar-link">Cookbook / Tasks</a></li>
                 </ul>
             </div>
             
@@ -74,48 +75,69 @@
         <main class="main-content">
             <section>
                 <h1>Launch System DSL</h1>
+                <p><strong>Goal:</strong> Orchestrate and run multiple nodes, parameters, and namespaces using the declarative Launch DSL.</p>
+                <p><strong>Tutorial level:</strong> Intermediate</p>
+                <p><strong>Time:</strong> 15 minutes</p>
+
+                <h2>Background</h2>
                 <p>
-                    ROS2 launch files allow starting, configuration, and coordination of multiple nodes. 
-                    (For standard designs, see the official <a href="https://docs.ros.org/en/ros2_documentation/concepts/about_launch.html" target="_blank">ROS2 Launch Concept documentation</a>).
+                    In ROS2, running robot stacks requires launching multiple executable nodes concurrently. Rather than starting 
+                    each node in a separate terminal, ROS2 uses launch files to define dependencies, namespaces, and node composition. 
                 </p>
                 <p>
-                    NOS features a dedicated <code>launch</code> statement block, mapping declarative node deployments, groups, arguments, 
-                    and composable component containers directly to Python ROS2 launch descriptions.
+                    (For design specifics, read the official <a href="https://docs.ros.org/en/ros2_documentation/concepts/about_launch.html" target="_blank">ROS2 Launch Concept documentation</a>).
                 </p>
 
-                <h2>Launch Arguments</h2>
-                <p>Declare runtime configurable arguments inside the <code>arguments</code> block:</p>
-                <pre><code class="language-python">launch VehicleBringup {
+                <h2>Prerequisites</h2>
+                <p>Ensure you have created your first package using the <a href="getting-started.html">Quickstart Guide</a>.</p>
+
+                <h2>Tasks</h2>
+
+                <h3>1. Write the launch configuration</h3>
+                <p>Define your multi-node launcher inside the <code>launch</code> statement block of your `.nos` file:</p>
+                <pre><code class="language-python">package navigation_system
+version "0.1.0"
+
+launch RobotBringup {
     arguments {
         use_sim_time: bool = true
-        max_speed: float = 1.0
     }
-}</code></pre>
-                <p>These compile to standard <code>DeclareLaunchArgument</code> nodes in the launch description.</p>
 
-                <h2>Group Nodes and Namespaces</h2>
-                <p>Group executable nodes under namespaces or scopes using <code>group</code> blocks:</p>
-                <pre><code class="language-python">group navigation @namespace("nav_stack") {
-    lidar: LidarProcessor {
-        scan_topic: "/scan"
+    # Group components under a shared namespace
+    group sensors @namespace("sensors") {
+        lidar: LidarDriver {
+            parameters: { use_sim: ${use_sim_time} }
+        }
+        camera: CameraDriver {
+            parameters: { fps: 30 }
+        }
     }
-    planner: PathPlanner {
-        sim_time: ${use_sim_time}
-    }
-}</code></pre>
-                <p>This maps to <code>GroupAction</code> containing the registered <code>Node</code> wrappers.</p>
 
-                <h2>Composable Component Containers</h2>
-                <p>
-                    In ROS2, multiple nodes can be loaded as plugins into a single OS process (container) to reduce 
-                    IPC latency. (For more details, see the official <a href="https://docs.ros.org/en/ros2_documentation/concepts/about_composition.html" target="_blank">ROS2 Composition Guide</a>).
-                </p>
-                <p>Declare component containers natively using <code>container</code>:</p>
-                <pre><code class="language-python">container sensors_container @name("sensor_manager") {
-    filter: PointCloudFilter
-    fusion: SensorFusion
+    # Setup composable component container process
+    container comp_container @name("nav_container") {
+        filter: PointCloudFilter
+        planner: PathPlanner
+    }
 }</code></pre>
-                <p>This compiles to a <code>ComposableNodeContainer</code> running the requested composable nodes inside a single process manager.</p>
+
+                <h4>Code Breakdown</h4>
+                <ul>
+                    <li><strong><code>arguments { ... }</code></strong>: Declares a launch parameter. Compiles to a <code>DeclareLaunchArgument</code> instance.</li>
+                    <li><strong><code>group sensors @namespace("sensors")</code></strong>: Enforces a `/sensors` namespace prefix on both <code>LidarDriver</code> and <code>CameraDriver</code> nodes. Compiles to a <code>GroupAction</code>.</li>
+                    <li><strong><code>container comp_container @name(...)</code></strong>: Spawns a <code>ComposableNodeContainer</code>, running both <code>PointCloudFilter</code> and <code>PathPlanner</code> as pluggable components in the same process to eliminate IPC overhead.</li>
+                </ul>
+
+                <h3>2. Compile and Build</h3>
+                <p>Compile the launch system:</p>
+                <pre><code class="language-bash">nos compile navigation.nos --output ./src</code></pre>
+                <p>The compiler generates a standard <code>RobotBringup.launch.py</code> file inside the package's <code>launch/</code> directory.</p>
+                <p>Build and source the workspace:</p>
+                <pre><code class="language-bash">colcon build --packages-select navigation_system
+source install/setup.bash</code></pre>
+
+                <h3>3. Run the Launch configuration</h3>
+                <p>Execute the generated launch file using the standard ROS2 launch utility:</p>
+                <pre><code class="language-bash">ros2 launch navigation_system RobotBringup.launch.py use_sim_time:=true</code></pre>
             </section>
         </main>
     </div>

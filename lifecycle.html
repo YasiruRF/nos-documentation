@@ -42,6 +42,7 @@
                     <li class="sidebar-item"><a href="index.html" class="sidebar-link">Introduction</a></li>
                     <li class="sidebar-item"><a href="installation.html" class="sidebar-link">Installation</a></li>
                     <li class="sidebar-item"><a href="getting-started.html" class="sidebar-link">Quickstart Guide</a></li>
+                    <li class="sidebar-item"><a href="cookbook.html" class="sidebar-link">Cookbook / Tasks</a></li>
                 </ul>
             </div>
             
@@ -74,46 +75,85 @@
         <main class="main-content">
             <section>
                 <h1>Managed Lifecycle Nodes</h1>
+                <p><strong>Goal:</strong> Create, compile, and transition a Managed Lifecycle Node using the NOS DSL.</p>
+                <p><strong>Tutorial level:</strong> Intermediate</p>
+                <p><strong>Time:</strong> 15 minutes</p>
+
+                <h2>Background</h2>
                 <p>
-                    ROS2 Managed Lifecycle Nodes allow deterministic control over the state of a node. 
-                    Rather than starting communications and node processes during construction, you can trigger transition states 
-                    (e.g., config, activate, deactivate, shutdown) via lifecycle management.
+                    Standard ROS2 Nodes start all execution routines in their constructors. However, for complex safety-critical 
+                    robotic systems, it is essential to manage node activation states deterministically. 
                 </p>
                 <p>
-                    (For design specifics, read the official <a href="https://design.ros2.org/articles/node_lifecycle.html" target="_blank">ROS2 Managed Lifecycle Design Article</a>).
+                    ROS2 Managed Lifecycle Nodes solve this by introducing a state machine (Unconfigured, Inactive, Active, Finalized). 
+                    For design specifics, see the <a href="https://design.ros2.org/articles/node_lifecycle.html" target="_blank">Official ROS2 Lifecycle Design Document</a>.
                 </p>
 
-                <h2>Declaring a Managed Node in NOS</h2>
-                <p>Simply declare <code>lifecycle: managed</code> inside your node block:</p>
-                <pre><code class="language-python">node CameraDriver {
+                <h2>Prerequisites</h2>
+                <p>Ensure you have completed the basic talker/listener guide in the <a href="getting-started.html">Quickstart Guide</a>.</p>
+
+                <h2>Tasks</h2>
+
+                <h3>1. Write the Managed Node</h3>
+                <p>Create a file named <code>camera.nos</code> and declare <code>lifecycle: managed</code> inside your node block:</p>
+                <pre><code class="language-python">package camera_system
+version "0.1.0"
+
+node CameraDriver {
     lifecycle: managed
 
+    publications {
+        image: sensor_msgs::Image @topic("/camera/image")
+    }
+
     on_configure -> {
-        self.get_logger().info("Hardware configured!")
+        # Initialize resources (e.g. open camera hardware connection)
+        self.get_logger().info("Hardware connection configured!")
     }
 
     on_activate -> {
-        self.get_logger().info("Sensor active, starting publications.")
+        # Start publications or timer execution loops
+        self.get_logger().info("Image streaming activated.")
     }
 
     on_deactivate -> {
-        self.get_logger().info("Sensor paused.")
+        # Stop publications
+        self.get_logger().info("Image streaming paused.")
     }
 
     on_cleanup -> {
-        self.get_logger().info("Hardware cleaned up.")
+        # Clean up resources
+        self.get_logger().info("Hardware resources cleaned up.")
     }
 }</code></pre>
 
-                <h2>Under the Hood Mappings</h2>
-                <p>
-                    NOS compiles the node into a subclass of <code>rclpy.lifecycle.LifecycleNode</code>. 
-                    It automatically manages the standard transition hooks and handles transition return values (<code>TransitionCallbackReturn.SUCCESS</code>).
-                </p>
+                <h4>Code Breakdown</h4>
                 <ul>
-                    <li><strong>Communications Setup:</strong> Publications and subscriptions are configured in the <code>on_configure</code> state transition callback to ensure topics are only instantiated when the node is in the configured state.</li>
-                    <li><strong>User Callbacks:</strong> The lifecycle transition methods are mapped directly to your custom <code>on_configure</code>, <code>on_activate</code>, <code>on_deactivate</code>, and <code>on_cleanup</code> code blocks.</li>
+                    <li><strong><code>lifecycle: managed</code></strong>: Instructs the compiler to inherit from <code>rclpy.lifecycle.LifecycleNode</code> rather than standard <code>Node</code>.</li>
+                    <li><strong><code>on_configure</code>, <code>on_activate</code>, <code>on_deactivate</code>, <code>on_cleanup</code></strong>: Corresponds to standard transition states. The generated wrapper handles routing transition return values (<code>TransitionCallbackReturn.SUCCESS</code>) automatically.</li>
                 </ul>
+
+                <h3>2. Compile, Build, and Run</h3>
+                <p>Compile the node:</p>
+                <pre><code class="language-bash">nos compile camera.nos --output ./src</code></pre>
+                <p>Build the package using Colcon from your workspace root:</p>
+                <pre><code class="language-bash">colcon build --packages-select camera_system
+source install/setup.bash
+ros2 run camera_system CameraDriver</code></pre>
+
+                <h3>3. Introspect and trigger state transitions</h3>
+                <p>In a new terminal window, use the official ROS2 lifecycle CLI commands to verify state changes:</p>
+                <pre><code class="language-bash"># Check the current state of the node (should return: unconfigured [1])
+ros2 lifecycle get /camera_driver
+
+# Configure the node (triggers on_configure)
+ros2 lifecycle set /camera_driver configure
+
+# Activate the node (triggers on_activate, begins publishing)
+ros2 lifecycle set /camera_driver activate
+
+# Pause the node (triggers on_deactivate)
+ros2 lifecycle set /camera_driver deactivate</code></pre>
             </section>
         </main>
     </div>
