@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Callbacks & Code Injection - NOS Documentation</title>
+    <link rel="stylesheet" href="index.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+</head>
+<body data-theme="dark">
+
+    <!-- Header -->
+    <header>
+        <div class="logo-container">
+            <img src="logo.png" alt="NOS Logo" class="logo-img">
+            <span class="logo-text">NOS</span>
+        </div>
+        <div class="header-controls">
+            <div class="search-wrapper">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="search-input" class="search-input" placeholder="Search documentation...">
+            </div>
+            <button id="theme-toggle-btn" class="theme-toggle-btn">
+                <span>☀️</span>
+            </button>
+            <a href="https://github.com/YasiruRF/nos.git" class="github-link" target="_blank">
+                <svg height="20" width="20" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                </svg>
+            </a>
+        </div>
+    </header>
+
+    <!-- App Container -->
+    <div class="app-container">
+        
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-group">
+                <h3 class="sidebar-title">Getting Started</h3>
+                <ul class="sidebar-list">
+                    <li class="sidebar-item"><a href="index.html" class="sidebar-link">Introduction</a></li>
+                    <li class="sidebar-item"><a href="installation.html" class="sidebar-link">Installation</a></li>
+                    <li class="sidebar-item"><a href="getting-started.html" class="sidebar-link">Quickstart Guide</a></li>
+                </ul>
+            </div>
+            
+            <div class="sidebar-group">
+                <h3 class="sidebar-title">Language Guide</h3>
+                <ul class="sidebar-list">
+                    <li class="sidebar-item"><a href="syntax.html" class="sidebar-link">Nodes & Layout</a></li>
+                    <li class="sidebar-item"><a href="callbacks.html" class="sidebar-link active">Callbacks & Code</a></li>
+                    <li class="sidebar-item"><a href="lifecycle.html" class="sidebar-link">Managed Lifecycle</a></li>
+                </ul>
+            </div>
+            
+            <div class="sidebar-group">
+                <h3 class="sidebar-title">Launch System</h3>
+                <ul class="sidebar-list">
+                    <li class="sidebar-item"><a href="launch.html" class="sidebar-link">Launch Configs</a></li>
+                </ul>
+            </div>
+
+            <div class="sidebar-group">
+                <h3 class="sidebar-title">Under the Hood</h3>
+                <ul class="sidebar-list">
+                    <li class="sidebar-item"><a href="security.html" class="sidebar-link">Security Sanitizer</a></li>
+                    <li class="sidebar-item"><a href="grammar.html" class="sidebar-link">Language Grammar</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <section>
+                <h1>Callbacks & Code Blocks</h1>
+                <p>
+                    NOS combines declarative architecture configuration with raw Python code injection. 
+                    Any block starting with <code>-> {</code> switches the parser context into Python mode, 
+                    capturing the contents and compiling it directly into Python methods inside the node class.
+                </p>
+
+                <h2>Builtin Lifecycle Events</h2>
+                <p>You can define hooks for standard events:</p>
+                <ul>
+                    <li><code>on_init</code>: Executed when the node finishes class construction (inside the node's <code>__init__</code> constructor).</li>
+                    <li><code>on_shutdown</code>: Executed when the node receives a shutdown signal (inside <code>rclpy.shutdown()</code> hooks).</li>
+                </ul>
+                <pre><code class="language-python">on_init -> {
+    self.get_logger().info("System has started!")
+    self.counter = 0
+}
+
+on_shutdown -> {
+    self.get_logger().info("System closing down.")
+}</code></pre>
+
+                <h2>Communication Callback Naming Mappings</h2>
+                <p>
+                    When subscription topics receive incoming data, the node wrapper executes callbacks. 
+                    You can name your handler in two ways:
+                </p>
+                <ol>
+                    <li>Using the prefix <code>on_&lt;subscription_name&gt;_received</code>:
+                        <pre><code class="language-python">subscriptions {
+    raw_data: std_msgs::Int32 @topic("/raw")
+}
+on on_raw_data_received(msg: std_msgs::Int32) -> {
+    # Callback logic
+}</code></pre>
+                    </li>
+                    <li>Using the simple name <code>&lt;subscription_name&gt;_received</code>:
+                        <pre><code class="language-python">on raw_data_received(msg: std_msgs::Int32) -> {
+    # Callback logic
+}</code></pre>
+                    </li>
+                </ol>
+                <p>NOS automatically resolves both formats and maps them securely to the topic wrapper.</p>
+
+                <div class="alert-box warning">
+                    <div class="alert-title">⚠️ Referencing Class Scope (Self)</div>
+                    <p>
+                        Because code blocks are transpiled directly into Python class methods, you must use standard Python 
+                        class scope structures. References to publishers, parameters, and other node utilities must be 
+                        prefixed with <code>self.</code>.
+                    </p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="index.js"></script>
+</body>
+</html>
