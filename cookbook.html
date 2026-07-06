@@ -201,6 +201,67 @@ message FilteredScan @id(10) {
         ]
     }
 }</code></pre>
+
+                <!-- TASK 7 -->
+                <h2>Task 7: If you want to declare and implement a ROS2 Action Server</h2>
+                <p>
+                    Declare your action type interfaces at the root package level, register the action in the 
+                    node's <code>actions</code> block, and implement the execution callback hook:
+                </p>
+                <pre><code class="language-python"># Define the custom action interface
+action MoveJoints @id(50) {
+    goal {
+        target_positions: list<float>
+    }
+    feedback {
+        current_positions: list<float>
+    }
+    result {
+        success: bool
+    }
+}
+
+node JointPtpNode {
+    actions {
+        # Declare the action server endpoint
+        set_joint_ptp: MoveJoints
+    }
+
+    on_init -> {
+        self.get_logger().info("Action server online")
+    }
+
+    # Goal Validation: Accept or reject incoming goal requests
+    on on_set_joint_ptp_goal(goal_request) -> {
+        self.get_logger().info("Received joint ptp goal request")
+        if len(goal_request.target_positions) > 0:
+            return GoalResponse.ACCEPT
+        return GoalResponse.REJECT
+    }
+
+    # Cancellation Validation: Accept or reject cancel requests
+    on on_set_joint_ptp_cancel(goal_handle) -> {
+        self.get_logger().info("Received cancel request")
+        return CancelResponse.ACCEPT
+    }
+
+    # Execute callback (routes to goal execution)
+    on on_set_joint_ptp_execute(goal_handle) -> {
+        self.get_logger().info("Executing point-to-point motion...")
+        
+        # Publish feedback values during loop
+        feedback_msg = MoveJoints.Feedback()
+        feedback_msg.current_positions = [1.5, 2.3]
+        goal_handle.publish_feedback(feedback_msg)
+        
+        # Complete goal and return result
+        goal_handle.succeed()
+        
+        result = MoveJoints.Result()
+        result.success = true
+        return result
+    }
+}</code></pre>
             </section>
         </main>
     </div>

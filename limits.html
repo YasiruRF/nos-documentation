@@ -89,6 +89,9 @@
                     <li><strong>Parameter Bounds Checking:</strong> Enforce runtime parameter rules (e.g. <code>@range</code> and <code>@one_of</code>) by automatically mapping them to official ROS2 <code>ParameterDescriptor</code> limits.</li>
                     <li><strong>QoS Mapping:</strong> Customize reliability, durability, history, and queue depth inline using the <code>@qos</code> helper annotation.</li>
                     <li><strong>Managed Node Lifecycles:</strong> Declare <code>lifecycle: managed</code> to inherit a deterministic state-transition machine, automatically routing configuration and activation hooks to your methods.</li>
+                    <li><strong>Action Server Code Generation:</strong> Creates fully compliant Action Servers, mapping user-implemented goal execution callbacks directly to the ROS2 Action Server wrapper.</li>
+                    <li><strong>Reentrant Callback Groups:</strong> Attach the <code>@reentrant</code> annotation to any subscription, service, or action to automatically configure a <code>ReentrantCallbackGroup</code>, preventing runtime deadlocks.</li>
+                    <li><strong>Service & Action Clients:</strong> Attach the <code>@client</code> annotation to any service or action block entry to compile it as an outgoing ROS2 client (<code>create_client</code> or <code>ActionClient</code>).</li>
                     <li><strong>Inline ROS2 Interface Creation:</strong> Define custom messages, services, and actions directly inside your `.nos` files (e.g. <code>message Point @id(10) { x: float }</code>). NOS will compile these into official `.msg`, `.srv`, and `.action` package files.</li>
                     <li><strong>Launch System Descriptions:</strong> Coordinate namespaces, dynamic arguments, composable component containers, and nested configurations in the launch DSL to generate `*.launch.py` scripts.</li>
                     <li><strong>Security Sanitization:</strong> Inspects all injected Python code blocks at compile time using AST (Abstract Syntax Tree) walking to prevent command injections and warn on file/network access.</li>
@@ -102,28 +105,13 @@
                     your declarative model or injected code blocks into C++ (<code>rclcpp</code>) packages.
                 </p>
 
-                <h3>2. No Callback Group Configuration</h3>
-                <p>
-                    To prevent callback starvation or deadlocks in multi-threaded environments, ROS2 uses Callback Groups 
-                    (e.g., <code>ReentrantCallbackGroup</code>). NOS does not support configuring Callback Groups inside the DSL. 
-                    If you make synchronous client service calls inside topic subscription callbacks, you must configure Callback 
-                    Groups manually using raw Python code.
-                </p>
-
-                <h3>3. No Multi-threaded Executor Control</h3>
+                <h3>2. No Multi-threaded Executor Control</h3>
                 <p>
                     NOS compiles packages using standard single-threaded executors. If your nodes require complex, multi-threaded 
                     thread pool execution or custom event loop executors, you must manage these executors manually in python scripts.
                 </p>
 
-                <h3>4. No Builtin Outgoing Client Syntax</h3>
-                <p>
-                    While you can easily declare a Service Server using the <code>services</code> block, the DSL has no built-in syntax 
-                    to initiate an outgoing Service *Client request* or Action *Goal request*. To invoke a service on another node, 
-                    you must declare the client and dispatch requests manually using raw <code>rclpy</code> calls inside your injected Python blocks.
-                </p>
-
-                <h3>5. Limited Nested Parameter Types</h3>
+                <h3>3. Limited Nested Parameter Types</h3>
                 <p>
                     NOS parameters only support primitive types (<code>int</code>, <code>float</code>, <code>double</code>, <code>string</code>, <code>bool</code>), 
                     lists (<code>list&lt;type&gt;</code>), and simple flat custom structures (<code>struct</code>). It does not support complex nested maps or dictionaries.

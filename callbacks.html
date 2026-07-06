@@ -97,6 +97,30 @@ on_shutdown -> {
     self.get_logger().info("System closing down.")
 }</code></pre>
 
+                <h2>Periodic Timers & Custom Callbacks</h2>
+                <p>
+                    Robotic tasks often require executing logic at fixed intervals (such as reading sensor values at 10 Hz, 
+                    or publishing averages at 1 Hz). To implement this in NOS, initialize a standard ROS2 timer inside 
+                    your <code>on_init</code> block, and define a matching custom callback method using the general <code>on</code> syntax:
+                </p>
+                <pre><code class="language-python">node SensorPublisher {
+    publications {
+        reading: std_msgs::Float64 @topic("reading")
+    }
+
+    on_init -> {
+        # Initialize a 10 Hz timer (0.1 seconds period)
+        self._timer = self.create_timer(0.1, self.my_timer_callback)
+    }
+
+    # Declare the custom callback method using the 'on' block
+    on my_timer_callback() -> {
+        msg = Float64()
+        msg.data = 42.0
+        self.reading.publish(msg)
+    }
+}</code></pre>
+
                 <h2>Communication Callback Naming Mappings</h2>
                 <p>
                     When subscription topics receive incoming data, the node wrapper executes callbacks. 

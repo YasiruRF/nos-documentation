@@ -128,6 +128,57 @@ launch RobotBringup {
                     <li><strong><code>container comp_container @name(...)</code></strong>: Spawns a <code>ComposableNodeContainer</code>, running both <code>PointCloudFilter</code> and <code>PathPlanner</code> as pluggable components in the same process to eliminate IPC overhead.</li>
                 </ul>
 
+                <h3>Launch Substitutions & Custom Commands (URDF / Xacro)</h3>
+                <p>
+                    For complex robotic setups (such as visualising robot manipulators with URDF and RViz), launch configurations 
+                    frequently need to locate package paths dynamically and execute parsing tools (e.g. running <code>xacro</code> to 
+                    generate URDF string parameters). 
+                </p>
+                <p>
+                    NOS supports calling common launch substitutions (<code>FindPackageShare</code>, 
+                    <code>PathJoinSubstitution</code>, and <code>Command</code>) directly inside node parameter overrides:
+                </p>
+                <pre><code class="language-python">launch RobotVisualisation {
+    arguments {
+        filename: string = "manipulator"
+    }
+
+    group default @namespace("") {
+        # Start robot_state_publisher with the loaded URDF string parameter
+        node robot_state_publisher: RobotStatePublisher {
+            parameters: {
+                robot_description: Command("xacro", PathJoinSubstitution(FindPackageShare("my_robot_pkg"), "urdf", filename + ".urdf.xacro"))
+            }
+        }
+
+        # Start joint_state_publisher_gui for visual sliders
+        node joint_state_publisher_gui: JointStatePublisherGui
+
+        # Start rviz2 with the saved config file path
+        node rviz2: RViz2 {
+            arguments: ["-d", PathJoinSubstitution(FindPackageShare("my_robot_pkg"), "config", filename + ".rviz")]
+        }
+    }
+}</code></pre>
+
+                <div class="alert-box info">
+                    <div class="alert-title">🔗 Under the Hood: Substitutions Resolution</div>
+                    <ul>
+                        <li>
+                            <strong><code>FindPackageShare("pkg")</code>:</strong> Automatically compiles to the ROS2 
+                            <code>FindPackageShare("pkg")</code> substitution, finding the installed path of the package.
+                        </li>
+                        <li>
+                            <strong><code>PathJoinSubstitution(...)</code>:</strong> Concatenates path segments using the platform-independent 
+                            <code>PathJoinSubstitution</code> utility.
+                        </li>
+                        <li>
+                            <strong><code>Command(...)</code>:</strong> Executes shell commands at launch time (such as running xacro) 
+                            and pipes the output directly as node parameters.
+                        </li>
+                    </ul>
+                </div>
+
                 <h3>2. Compile and Build</h3>
                 <p>Compile the launch system:</p>
                 <pre><code class="language-bash">nos compile navigation.nos --output ./src</code></pre>

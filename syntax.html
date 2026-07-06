@@ -80,10 +80,13 @@
                 <h2>Package Decl</h2>
                 <p>
                     Every NOS file must start with a <code>package</code> statement. Packages correspond to 
-                    ROS2 package names and encapsulate all declared nodes and launch layouts.
+                    ROS2 package names and encapsulate all declared nodes and launch layouts. You can also declare 
+                    external package dependencies (e.g. standard message or service interfaces) to be registered 
+                    automatically in the generated build configurations (such as <code>package.xml</code>):
                 </p>
                 <pre><code class="language-python">package package_name
-version "1.0.0"</code></pre>
+version "1.0.0"
+depends: ["std_msgs", "std_srvs"]</code></pre>
 
                 <h2>Nodes</h2>
                 <p>
@@ -118,9 +121,11 @@ version "1.0.0"</code></pre>
 
                 <h2>Publications & Subscriptions</h2>
                 <p>
-                    Topics are defined inside <code>subscriptions</code> and <code>publications</code> blocks, matching specific 
-                    ROS2 message interfaces.
+                    Topics represent unidirectional, many-to-many communication channels. They are used for continuous high-frequency data 
+                    streams, such as sensor readings or velocity commands.
                 </p>
+
+                <h3>DSL Syntax</h3>
                 <pre><code class="language-python">subscriptions {
     scan: sensor_msgs::LaserScan @topic("/scan")
 }
@@ -129,7 +134,24 @@ publications {
     cmd_vel: geometry_msgs::Twist @topic("/cmd_vel") @qos(reliable, depth=10)
 }</code></pre>
 
-                <h3>QoS Configurations</h3>
+                <div class="alert-box info">
+                    <div class="alert-title">🔗 Under the Hood: Topics Implementation</div>
+                    <ul>
+                        <li>
+                            <strong>Subscribers:</strong> The compiler generates a call to <code>self.create_subscription()</code> inside 
+                            <code>_setup_communications()</code>. It automatically registers a hidden, private wrapper callback 
+                            <code>_on_[name]_received(self, msg)</code>. This wrapper catches any user-code execution exceptions and logs them via 
+                            <code>self.get_logger().error()</code>, protecting the node process from fatal crashes.
+                        </li>
+                        <li>
+                            <strong>Publishers:</strong> Spawns a <code>self.create_publisher()</code> call. The compiler exposes the publisher 
+                            as a public class attribute <code>self.[name]</code>, allowing you to call <code>self.[name].publish(msg)</code> 
+                            from any execution handler.
+                        </li>
+                    </ul>
+                </div>
+
+                <h3>QoS (Quality of Service) Configurations</h3>
                 <p>
                     The <code>@qos</code> annotation maps directly to ROS2 Quality of Service Profiles. Supported arguments include:
                 </p>
@@ -139,6 +161,109 @@ publications {
                     <li><strong>History:</strong> <code>keep_last</code>, <code>keep_all</code> (Corresponds to <code>HistoryPolicy</code>).</li>
                     <li><strong>Depth:</strong> <code>depth=integer_value</code> (Corresponds to Queue size).</li>
                 </ul>
+
+                <h2>Action Servers (Actions)</h2>
+                <p>
+                    Actions are designed for long-running, asynchronous tasks that take time to complete (such as navigating robot arms 
+                    or moving to a coordinate). Actions provide goal control, feedback updates, and final result reporting.
+                </p>
+
+                <h3>DSL Syntax</h3>
+                <pre><code class="language-python"># 1. Declare the action interface
+action NavigateToGoal @id(40) {
+    goal {
+        target_pose: geometry_msgs::PoseStamped
+    }
+    feedback {
+        current_pose: geometry_msgs::PoseStamped
+        distance_remaining: float
+    }
+    result {
+        success: bool
+        total_time: float
+    }
+}
+
+node NavigationNode {
+    # 2. Register the action server
+    actions {
+        navigate: NavigateToGoal
+    }
+}</code></pre>
+
+                <div class="alert-box info">
+                    <div class="alert-title">🔗 Under the Hood: Action Servers Implementation</div>
+                    <ul>
+                        <li>
+                            <strong>Action Server Initialization:</strong> The compiler instantiates a fully compliant ROS2 
+                            <code>ActionServer</code> inside the <code>_setup_communications()</code> initialization hook, passing 
+                            your node, action message class, action name, and a goal execution callback.
+                        </li>
+                        <li>
+                            <strong>Execute Wrappers:</strong> The compiler generates a private wrapper method 
+                            <code>_on_navigate_execute(self, goal_handle)</code>. If the user-defined callback fails or throws an exception, 
+                            the wrapper intercepts the crash, logs the traceback, and automatically calls <code>goal_handle.abort()</code> 
+                            to maintain graph stability.
+                        </li>
+                        <li>
+                            <strong>Goal Handling:</strong> Developers write their execution loop in the 
+                            <code>on_navigate_execute(self, goal_handle)</code> callback. Periodic updates are dispatched by calling 
+                            <code>goal_handle.publish_feedback(feedback_msg)</code>. Once complete, you call <code>goal_handle.succeed()</code> 
+                            and return a compiled Action Result object.
+                        </li>
+                        <li>
+                            <strong>Goal & Cancel Validation:</strong> If you declare callback handlers named <code>on_[action_name]_goal(self, goal_request)</code> 
+                            or <code>on_[action_name]_cancel(self, goal_handle)</code>, the compiler registers them as the 
+                            <code>goal_callback</code> and <code>cancel_callback</code> on the ActionServer. Returning 
+                            <code>GoalResponse.ACCEPT</code> (or <code>REJECT</code>) and <code>CancelResponse.ACCEPT</code> (or <code>REJECT</code>) 
+                            allows validating goal arguments before task execution begins.
+                        </li>
+                    </ul>
+                </div>
+
+                <h2>Concurrency & Clients (Callback Groups & Outgoing Calls)</h2>
+                <p>
+                    Robotic nodes frequently need to initiate outgoing requests (clients) or handle concurrent execution loops safely 
+                    without blocking callback execution threads (causing deadlock).
+                </p>
+
+                <h3>DSL Syntax</h3>
+                <pre><code class="language-python">node SensorGateway {
+    subscriptions {
+        # Trigger reentrant threading for this subscription
+        sensor_data: sensor_msgs::LaserScan @topic("/scan") @reentrant
+    }
+
+    services {
+        # Declare an outgoing service client (using @client annotation)
+        add_service: example_interfaces::AddTwoInts @service("/add") @client
+    }
+
+    actions {
+        # Declare an outgoing action client
+        nav_client: nav2_msgs::NavigateToPose @client @reentrant
+    }
+}</code></pre>
+
+                <div class="alert-box info">
+                    <div class="alert-title">🔗 Under the Hood: Concurrency & Clients Implementation</div>
+                    <ul>
+                        <li>
+                            <strong>Reentrant Callback Groups (<code>@reentrant</code>):</strong> The compiler automatically instantiates 
+                            a ROS2 <code>ReentrantCallbackGroup</code> inside the node class constructor. It registers the subscription, 
+                            publisher, service, or action to use this callback group, enabling multithreaded concurrent callback executions.
+                        </li>
+                        <li>
+                            <strong>Outgoing Service Clients (<code>@client</code> inside services):</strong> Compiles to a ROS2 Service Client 
+                            <code>self.add_service = self.create_client(AddTwoInts, "/add")</code>. No server-side request callback wrappers 
+                            are generated.
+                        </li>
+                        <li>
+                            <strong>Outgoing Action Clients (<code>@client</code> inside actions):</strong> Compiles to a ROS2 Action Client 
+                            <code>self.nav_client = ActionClient(self, NavigateToPose, 'nav_client')</code>.
+                        </li>
+                    </ul>
+                </div>
             </section>
         </main>
     </div>
