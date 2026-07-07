@@ -152,6 +152,18 @@ source install/setup.bash</code></pre>
                 <h3>4. Run the node</h3>
                 <p>Run the generated node executable using the standard ROS2 runner command:</p>
                 <pre><code class="language-bash">ros2 run filter_system ValueFilter</code></pre>
+
+                <h2>Alternative: Visual Block Programming</h2>
+                <p>
+                    If you prefer visual programming or want to scaffold a node layout rapidly without writing DSL syntax by hand, 
+                    you can use the built-in <strong>Visual CodeBlock Editor</strong>. Run the following command in your terminal:
+                </p>
+                <pre><code class="language-bash">nos-codeblock</code></pre>
+                <p>
+                    This automatically launches a local compilation server and opens the editor in your default web browser. You can 
+                    add, arrange, and configure nodes, parameters, publishers, subscribers, services, and timers. The generated DSL 
+                    code updates in real-time in the sidebar preview, and you can compile and save directly to your workspace files.
+                </p>
             </section>
         </main>
     </div>
